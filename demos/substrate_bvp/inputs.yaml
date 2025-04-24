@@ -1,0 +1,97 @@
+
+### What do we want to control from the input file? ###
+
+# Path to input file, mesh, and potentially other things...
+# directory: "/home/bthomas/Desktop/Research/NNFE/CARDIAX/demos/input_file"
+
+
+directory: "/home/akyul/CARDIAX/demos/input_file"
+
+### FE object ###
+# Mesh, quadrature, dim
+# Will need to point to a mesh
+# Make a special case if someone says cube?
+mesh_info:
+  framework: "FEM" # FEM or IGA
+  # mesh_path: "msh/box.vtk"
+  mesh_params:
+    Nx: 
+    Ny:
+    Lx:
+    Ly:
+  fe_params:
+    ele_type: "hexahedron"
+    gauss_order: 1
+    vec: 3
+    deg: 1
+    dim: 2
+
+### Boundary Condition INFO ###
+
+# Potential BC types: Dirichlet, Neumann, Pressure, Spring, ...
+# Surface must be tagged, give key value for the surface
+# bc_info:
+#   bc1:
+#     type: "Dirichlet"
+#     component: [0, 1, 2]
+#     value: [0.0, 0.0, 0.0]
+#     surface_tag: "bottom"
+#   bc2:
+#     type: "Neumann"
+#     value: [0.0, 0.0, -1.0]
+#     surface_tag: "top"
+
+bc_info:
+  bc1:
+    type: "Dirichlet"
+    component: [0, 1, 2]
+    value: [0.0, 0.0, 0.0]
+    surface_tag: "bottom"
+  # allow the user to specify FUNCTIONS that
+  # can be used to apply dirichlet boundary conditions.
+  # they will be passed as strings.
+  bc2:
+    type: "Dirichlet"
+    component: [2]
+    value: "substrate_sinusoid"
+    surface_tag: "bottom"
+    
+### Problem object ###
+# PDE to solve (mainly Hyperelasticity)
+# Material model to use (allow adjusting constants)
+# Boundary conditions to apply
+# Faces to apply boundary conditions to (tagged mesh)
+
+# pde_info:
+#   pde_type: "Hyperelasticity"
+#   material_model: "NeoHookean" # Defines the get_tensor_map
+#   material_constants:
+#     E: 10.
+#     nu: 0.3
+
+pde_info:
+  # pde_type will always be the same for now...
+  pde_type: "Hyperelasticity"
+  # 'material model' defines the material model and kernels that are used to describe the problem.
+  material_model: "LinearElastic" # LinearElastic, LinearElastic_Traction, LinearElastic_PreStress
+  # try to make prescribing spatially varying material parameters robust;
+  # this is going to be specific to film-substrate systems for now.
+  material_constants:
+    E_f: 10.
+    nu_f: 0.3
+    E_s: 
+    nu_s:
+
+### Solver object ###
+
+solver_info:
+  solver_type: "Newton"
+  
+  solver_params:
+    max_iter: 20
+    atol: 1.0e-6
+
+# my postprocessing needs will be totally different.
+# plot_info:
+#   plot: True
+#   filename: "output.png"
