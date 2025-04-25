@@ -15,15 +15,18 @@ mesh_info:
   framework: "FEM" # FEM or IGA
   # mesh_path: "msh/box.vtk"
   mesh_params:
-    Nx: 
-    Ny:
-    Lx:
-    Ly:
+    space: '2D'
+    Nx: 10
+    Ny: 10
+    Lx: 1
+    Ly: 1
+    # deg lives here because it is not used as input to a FiniteElement object
+    deg: 1
+
   fe_params:
     ele_type: "hexahedron"
     gauss_order: 1
     vec: 3
-    deg: 1
     dim: 2
 
 ### Boundary Condition INFO ###
@@ -53,8 +56,9 @@ bc_info:
   bc2:
     type: "Dirichlet"
     component: [2]
-    value: "substrate_sinusoid"
-    surface_tag: "bottom"
+    value: ["substrate_sinusoid"]
+    params: [1,1] # A, k
+    surface_tag: "top"
     
 ### Problem object ###
 # PDE to solve (mainly Hyperelasticity)
