@@ -70,7 +70,7 @@ if __name__ == "__main__":
     # define element size heuristically from previous wrinkling examples
     num_substrate_cells = 1
     # u_max = 0.02            # 20 um
-    u_max = 0.01 * H
+    u_max = 0.02 * H
     num_ramp_steps = 100             # need to step the dirichlet boundary condition!
     y_ratio = h/num_substrate_cells
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         #Nx, Ny = int(H / y_ratio), int((H + h) / y_ratio)
         
         # manually prescribing the number of cells; need to use mesh refinement now.
-        Nx, Ny = 20,22
+        Nx, Ny = 100,101
         Lx, Ly = H, H + h
         vec = 2
         dim = 2
@@ -179,23 +179,28 @@ if __name__ == "__main__":
                 
                 # Define boundary locations.
                 # x == 0
-                def left(point, i=1):
+                def left(point, i=0):
                     return np.isclose(point[0], 0., atol=1e-7)
                 # x == Lx
 
                 # might need to make this a moving boundary? idk what's going on.
-                def right(point,i=1):
-                    return np.isclose(point[0], Lx - i * u_max / num_ramp_steps, atol=1e-7)
+                # def right(point,**kwargs):
+                #     return np.isclose(point[0], Lx - kwargs['i'] * u_max / num_ramp_steps, atol=1e-7)
+                
+                # points won't move, so we don't need to save anything
+                # I think things are getting messed up because none of these functions are pure...
+                def right(point,Lx):
+                    return np.isclose(point[0], Lx, atol=1e-7)
                 
                 # x ==0 and y == 0
-                def front_left(point, i=1):
+                def front_left(point, i=0):
                     return np.isclose(point[0], 0., atol=1e-7) * np.isclose(point[1], 0., atol=1e-7)
                 
                 # y == 0
-                def front(point,i=1):
+                def front(point,i=0):
                     return np.isclose(point[1], 0., atol=1e-7)
                 # y == Ly
-                def back(point,i=1):
+                def back(point,i=0):
                     return np.isclose(point[1], Ly, atol=1e-7)
                 # # z == 0
                 # def bottom(point):
@@ -204,11 +209,12 @@ if __name__ == "__main__":
                 # def top(point):
                 #     return np.isclose(point[2], Lz, atol=1e-5)
 
-                def u_ramp(point, i=1):
-                    return -1 * (i+1) * u_max / num_ramp_steps
+                # this seems to not be updating...
+                def u_ramp(point, i, u_max, num_ramp_steps):
+                    return -1 * (i + 1) * u_max / num_ramp_steps
                 
                 # Define Dirichlet boundary values.
-                def u_0(point):
+                def u_0(point, **kwargs):
                     return 0.
                 
                 # only small strain should be required to cause buckling
@@ -238,7 +244,12 @@ if __name__ == "__main__":
 
 
                 # define the problem and solver
-                problem = LinearElastic(fe, dirichlet_bc_info = dirichlet_bc_info)
+                # the kwargs don't seem to be getting updated...
+                dbc_kwargs = {'i': 0, 'u_max': u_max, 'num_ramp_steps': num_ramp_steps, 'Lx': Lx}
+                problem = LinearElastic(fe, dirichlet_bc_info = dirichlet_bc_info, dbc_kwargs=dbc_kwargs)
+                
+                # problem = LinearElastic(fe, dirichlet_bc_info = dirichlet_bc_info, i=0)
+                
                 problem.internal_vars = [lmbda, mu]
 
                 solver = Newton_Solver(problem, np.zeros_like(fe.nodes), line_search_flag=False)
@@ -296,8 +307,13 @@ if __name__ == "__main__":
                         # solver.problem = problem
                         # ^ re-loading the problem class at each iteration is far too expensive to do this
 
+                        dbc_kwargs['i'] = i
+
                         # might need to allow for a custom solver to be used to better handle contact...
-                        sol, info = solver.solve(atol=1e-5, max_iter=30, i=i)
+                        sol, info = solver.solve(atol=1e-5, max_iter=30, dirichlet_bc_info=dirichlet_bc_info, **dbc_kwargs)
+
+                        # update the initial guess!
+                        solver.initial_guess = sol
 
                         # need to figure out how the solver class interfaces with the problem class to update
                         # the boundary condition stepping..

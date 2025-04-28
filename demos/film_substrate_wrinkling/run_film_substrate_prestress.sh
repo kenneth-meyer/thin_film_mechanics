@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # TESTING PARAMETERS
-h=0.2
-H=2
+# h=0.2
+# H=2
 # E_s=2.97   # 10 MPa
 # nu_s=0.495
 # E_f=7300 # 7300 MPa
@@ -14,12 +14,12 @@ H=2
 # nu_f=0.45
 
 # material parameters
-# h=0.001    # 1 um
-# H=1.0      # 1000 um
-# E_s=2.97   # 10 MPa
-# nu_s=0.495
-# E_f=7300 # 7300 MPa
-# nu_f=0.35
+h=0.01    # 10 um
+H=1.0      # 1000 um
+E_s=2.97   # 10 MPa
+nu_s=0.495
+E_f=7300 # 7300 MPa
+nu_f=0.35
 
 # can scale the initial membrane force (not used for dirichlet-based compression)
 f_scale=1.005
