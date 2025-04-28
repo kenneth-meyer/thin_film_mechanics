@@ -21,29 +21,42 @@ from cardiax.utils import save_sol
 
 from thin_film_src.thinfilm_inputfile_handler import create_2d_mesh, create_3d_mesh
 from thin_film_src.material_models import LinearElastic
+from thin_film_src.film_substrate_helpers import FilmSubstrate
 
 import time
 import pickle
-
-def get_A():
-    raise NotImplementedError
-
-def get_k():
-    raise NotImplementedError
+import sys
+        
 
 # executable portion of the file
 if __name__ == "__main__":
-    
+
+    # allow the user to vary poisson's ratio to examine effects of it changing
+    try:
+        E_s = float(sys.argv[1])
+        nu_s = float(sys.argv[2])
+        
+    except:
+        E_s = 10
+        nu_s = 0.4
+        
     # name of the job we're running
     RUN_NAME ="substrate_bvp"
     data_dir_top = "/workspace/kmeyer/research/cardiax_testing/wrinkling/subrate_bvp"
+
+    # NOTE: accepting these, and maybe mesh params, as input to automate some simulation runs
+    # would be SICK. need to do this asap.
+    # need to SET these!
+    A = 0.02
+    lmbda = 0.05
+    k = 2 * np.pi / lmbda
 
     # determine the case of the problem to set up the geometry
     CASE = '2D'
 
     if CASE == '2D':
-        Nx, Ny = 40,40
-        Lx, Ly = 1.0,1.0
+        Nx, Ny = 4, 2
+        Lx, Ly = 1.0, 1.0
         vec = 2
         dim = 2
     else:
@@ -55,66 +68,29 @@ if __name__ == "__main__":
     # GMSH mesh was not behaving well.
     # load a mesh generated from GMSH - is a .msh file I think
     # mesh_file = "stacked_mesh_no_refinement.msh"
-    
-    # material properties for the substrate
-    E_s = 10.
-    nu_s = 0.33
-    mu_s = E_s/2/(1+nu_s)
-    lmbda_s = E_s*nu_s/(1+nu_s)/(1-2*nu_s)
-
-    # material properties for the thin film
-    E_f = 10. * 10**4
-    nu_f = 0.33
-    mu_f = E_f/2/(1+nu_f)
-    lmbda_f = E_f*nu_f/(1+nu_f)/(1-2*nu_f)
 
     # determine the amplitude and wavenumber from the 
     # material and geometry
 
-    # need to define these functions
-    A = get_A()
-    k = get_k()
-
-    # decide if we want to adaptively step - indenter height is what is being stepped.
-    ADAPTIVE_LOAD_STEP = False
-
-    # model params (see load stepper below)
-    f_0 = 0.1
-    # R = 0.5
-    # k_pen_list = [1]
-    # h_0 = 0.02
-
     # film/substrate params (geometric)
     h_s = 0.01
 
-    # load stepping parameters - need to reset after each discretization/problem, hence the use of 'init' variables    
-    delta_f_init = 0.1 # needs to decrease!
-    delta_f = delta_f_init
-    f_step_init = f_0                # initialize the load step
-    f_step = f_step_init
-    # f_max will be fixed
-    f_max = 1
-    
-    # # define problem geometry - hopefully there are no bugs with 2D...
-    # # (try compression first to check maybe?)
-    # # keeping this in 3D so I can more easily assess where potential bugs are occuring...
-    # # FOR TESTING
-    # DEBUG = False
-    # if DEBUG:
-    #     Nx, Ny, Nz = 1, 7, 1
-    # else:
-    #     Nx, Ny, Nz = 40, 7, 40   
-
-
-    # need to make sure we can resolve the film vs. the substrate
-
-    # might want to find a way to define the center of the indenter to be at 0.5,0.5
+    if CASE == '2D':
+        # h_f, H_s, E_s, nu_s, E_f, nu_f
+        film_subrate_obj = FilmSubstrate(h_s, Ly, 10, nu_s, 10**5, 0.3)
+    else:
+        film_subrate_obj = FilmSubstrate(h_s, Lz, 10, nu_s, 10**5, 0.3)
+        
+    # can use these functions to derive an analytical wavenumber and amplitude
+    # for a system with some initial film force
+    # A = film_subrate_obj.get_unitless_amplitude_thick_limit()
+    # k = film_subrate_obj.get_unitless_wavenumber_thick_limit()
 
 
     # define the types of problems we want to run
     problem_list = ['hex']
     degree_list = [1]
-    refinements = [1] # multiplies number of knot spans in each direction
+    refinements = [1,2,4] # multiplies number of knot spans in each direction
 
     # dictionary to save data in.
     save_dict = {}
@@ -129,13 +105,19 @@ if __name__ == "__main__":
     # iterate through each problem type
     for n in refinements:
         
-        Nx_n = Nx * n
-        Ny_n = Ny * n
-        Nz_n = Nz * n
-        # grouping simulations by discretization for now.
-        data_dir = data_dir_top + "/" + str(Nx_n) + "_" + str(Ny_n) + "_" + str(Nz_n)
-        # data_dir = data_dir_top + "/" + str(Nx_n) + "_" + str(Ny_n)
-
+        if CASE=='2D':
+            Nx_n = Nx * n
+            Ny_n = Ny * n
+            # grouping simulations by discretization for now.
+            data_dir = data_dir_top + "/" + str(Nx_n) + "_" + str(Ny_n)
+        
+        else:
+            Nx_n = Nx * n
+            Ny_n = Ny * n
+            Nz_n = Nz * n
+            # grouping simulations by discretization for now.
+            data_dir = data_dir_top + "/" + str(Nx_n) + "_" + str(Ny_n) + "_" + str(Nz_n)
+        
         # make the directory, it's ok if it already exists.
         os.makedirs(data_dir, exist_ok=True)
 
@@ -160,9 +142,9 @@ if __name__ == "__main__":
                 #                 Nx_n, Ny_n, Nz_n, Lx, Ly, Lz, deg, vec, dim, data_dir)
 
                 if CASE == '2D':
-                    mesh_obj, ele_type = create_2d_mesh(Nx, Ny, Lx, Ly, deg)
+                    mesh_obj, ele_type = create_2d_mesh(Nx_n, Ny_n, Lx, Ly, deg)
                 elif CASE == '3D':
-                    mesh_obj = create_3d_mesh(Nx, Ny, Nz, Lx, Ly, Lz, deg, data_dir)
+                    mesh_obj = create_3d_mesh(Nx_n, Ny_n, Nz, Lx, Ly, Lz, deg, data_dir)
                 
                 # not really sure what gauss order should be here tbh
                 fe = FiniteElement(mesh_obj, vec, dim, ele_type, gauss_order = deg)
@@ -201,8 +183,8 @@ if __name__ == "__main__":
                     return A * np.cos(k*point[0])
 
                 # define dirichlet boundary conditions
-                bc0 = [[front]*3, [0,1,2], [u_0]*3]
-                bc1 = [[back], [2], [u_cosine]]  
+                bc0 = [[front]*2, [0,1], [u_0]*2]
+                bc1 = [[back], [1], [u_cosine]]  
                 
                 dirichlet_bc_info = [[bc0, bc1]]
 
@@ -210,9 +192,9 @@ if __name__ == "__main__":
                 problem = LinearElastic(fe, dirichlet_bc_info = dirichlet_bc_info)
 
                 # need to define lmbda and mu
-                temp_array = onp.ones((problem.num_quads, vec, dim))
-                lmbda = lmbda_s * temp_array
-                mu = mu_s * temp_array
+                temp_array = onp.ones((fe.num_cells, fe.num_quads, vec, dim))
+                lmbda = film_subrate_obj.lmbda_s * temp_array
+                mu = film_subrate_obj.mu_s * temp_array
                 
                 # do we need to call a 'set' function?
                 problem.internal_vars = [lmbda, mu]
@@ -231,11 +213,11 @@ if __name__ == "__main__":
                     status = 'failed'
 
                 # write the solution to a file
-                sol_file = data_dir + "/substrate_bvp"+ str(f_max) + "_" + str(problem_type) + "_" + str(deg) + '.vtu'
+                sol_file = data_dir + "/substrate_bvp_" + str(nu_s) + str(h_s) + "_" + str(problem_type) + "_" + str(deg) + '_case_' + CASE + '.vtu'
                 
                 # save_sol only works for hexahedral elements right now...
                 # updating this in the next push.
-                save_sol(fe, sol, sol_file)
+                save_sol(fe, sol, sol_file, cell_type=ele_type)
                 
                 # save dictionary at each step as we might eventually run out of memory for cubic bspline
                 with open(RUN_NAME + ".pickle", 'wb') as f:

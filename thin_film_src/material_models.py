@@ -29,6 +29,32 @@ class LinearElastic(Problem):
             return sigma
         return stress
 
+class LinearElasticPrestrain(Problem):
+    
+    # need to pass a lambda function of some sort to account for a spatially varying material property
+    # is there a way to MODEL the interface between the film and the substrate?
+    #
+    # applying material properties based on mesh tags would be a great thing to implement through this...
+    def get_tensor_map(self):
+        def stress(u_grad, lmbda, mu, e_11):
+
+            # small strain tensor
+            epsilon = 0.5 * (u_grad + u_grad.T)
+            
+            # manually prescribe the pre-strain
+            # I think lmbda and mu are defined as [dim x dim] tensors,
+            # which doesn't change computation (???) but is sketch.
+            #pre_strain = np.eye(self.dim[0]).at[0,0].set(e_11[0,0])
+
+            pre_strain = np.array([[1.,0.],[0.,0.]]) * e_11
+
+            # incorporate the prestrain into the model
+            epsilon_pre_strain = epsilon + pre_strain
+            
+            sigma = lmbda * np.trace(epsilon_pre_strain) * np.eye(self.dim[0]) + 2 * mu * epsilon_pre_strain
+            return sigma
+        return stress
+
 class LinearElastic_Traction(Problem):
     
     # need to pass a lambda function of some sort to account for a spatially varying material property

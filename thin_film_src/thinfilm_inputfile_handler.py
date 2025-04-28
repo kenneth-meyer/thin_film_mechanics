@@ -110,7 +110,7 @@ def get_problem(problem_type):
 
     if problem_type == "LinearElastic":
         problem = LinearElastic
-    elif problem_type == "LinearElastic_Traction"
+    elif problem_type == "LinearElastic_Traction":
         problem = LinearElastic_Traction
     else:
         raise Exception("The material model you requested was not found! oops")
