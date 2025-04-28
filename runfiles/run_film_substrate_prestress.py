@@ -39,12 +39,13 @@ if __name__ == "__main__":
     try:
         # should prolly read these as a yaml file, oh well
         h = float(sys.argv[1])
-        H = float(sys.argv[2])
-        E_s = float(sys.argv[3])
-        nu_s = float(sys.argv[4])
-        E_f = float(sys.argv[5])
-        nu_f = float(sys.argv[6])
-        f_c_scale = float(sys.argv[7])
+        w = float(sys.argv[2])
+        D = float(sys.argv[3])
+        E_s = float(sys.argv[4])
+        nu_s = float(sys.argv[5])
+        E_f = float(sys.argv[6])
+        nu_f = float(sys.argv[7])
+        f_c_scale = float(sys.argv[8])
 
     except:
         # raise Exception("Invalid input!")
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     data_dir_top = "/workspace/kmeyer/research/cardiax_testing/wrinkling/nikravesh_recreation"
 
     # save each run based on the material parameters used!
-    data_dir = data_dir_top + "/h_" + str(h) + "_H_" + str(H) + "_Es_"+ str(E_s) + "_nus_"+ str(nu_s) + "_Ef_"+ str(E_f) + "_nuf_" + str(nu_f)    
+    data_dir = data_dir_top + "/h_" + str(h) + "_w_" + str(w) + "_D_" + str(D) + "_Es_"+ str(E_s) + "_nus_"+ str(nu_s) + "_Ef_"+ str(E_f) + "_nuf_" + str(nu_f)    
 
     # determine the case of the problem to set up the geometry
     CASE = '2D'
@@ -70,7 +71,8 @@ if __name__ == "__main__":
     # define element size heuristically from previous wrinkling examples
     num_substrate_cells = 1
     # u_max = 0.02            # 20 um
-    u_max = 0.02 * H
+    # u_max = 0.02 * H
+    u_max = 0.01
     num_ramp_steps = 100             # need to step the dirichlet boundary condition!
     y_ratio = h/num_substrate_cells
 
@@ -80,8 +82,8 @@ if __name__ == "__main__":
         #Nx, Ny = int(H / y_ratio), int((H + h) / y_ratio)
         
         # manually prescribing the number of cells; need to use mesh refinement now.
-        Nx, Ny = 100,101
-        Lx, Ly = H, H + h
+        Nx, Ny = 1120,562 # this is just 1 cell thick for the substrate, need
+        Lx, Ly = w, D + h
         vec = 2
         dim = 2
         deg = 1 # linear elements
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         deg = 1 # linear elements
 
     # h_f, H_s, E_s, nu_s, E_f, nu_f
-    film_substrate_obj = FilmSubstrate(h, H, E_s, nu_s, E_f, nu_f, deg, dim)
+    film_substrate_obj = FilmSubstrate(h, D, E_s, nu_s, E_f, nu_f, deg, dim)
 
     # get critical force, scale by factor set in input file
     N_c = film_substrate_obj.get_critical_force_thin_limit()
@@ -103,6 +105,16 @@ if __name__ == "__main__":
     # note: does this need to be scaled depending on how many elements we have? likely not.
     # needs to be in compression...
     e_11_0 = N_0_11 / (h * film_substrate_obj.E_f_bar)
+
+    print("e_11_0 required?")
+    print(e_11_0)
+
+    print("N_c")
+    print(N_c)
+
+    # should realistically be checking against these....
+    print("wavelength")
+    print(film_substrate_obj.get_wavelength_thick_limit())
 
     # define the types of problems we want to run
     problem_list = ['hex']
@@ -210,8 +222,11 @@ if __name__ == "__main__":
                 #     return np.isclose(point[2], Lz, atol=1e-5)
 
                 # this seems to not be updating...
-                def u_ramp(point, i, u_max, num_ramp_steps):
-                    return -1 * (i + 1) * u_max / num_ramp_steps
+                # def u_ramp(point, i, u_max, num_ramp_steps):
+                #     return -1 * (i + 1) * u_max / num_ramp_steps
+                
+                def u_ramp(point, u_i):
+                    return -1 * u_i
                 
                 # Define Dirichlet boundary values.
                 def u_0(point, **kwargs):
@@ -238,6 +253,10 @@ if __name__ == "__main__":
                 # define lmbda and mu as spatially varying fields
                 lmbda, mu = spatially_varying_linear_elastic_moduli(fe, film_substrate_obj, num_cells_in_plane=Nx, num_f_cells = num_substrate_cells, perturb=True)
 
+                # check that the parameters are not the same
+                assert(len(onp.unique(lmbda)) > 1)
+                print(onp.unique(lmbda, return_counts=True))
+
                 # define the pre-stress applied to the film
                 substrate_e_11 = 0 # don't apply prestrain to the substrate
                 e_11 = film_prestrain(fe, film_substrate_obj, e_11_0, substrate_e_11)
@@ -245,7 +264,9 @@ if __name__ == "__main__":
 
                 # define the problem and solver
                 # the kwargs don't seem to be getting updated...
-                dbc_kwargs = {'i': 0, 'u_max': u_max, 'num_ramp_steps': num_ramp_steps, 'Lx': Lx}
+                u_i = u_max / num_ramp_steps
+
+                dbc_kwargs = {'u_i': u_i, 'Lx': Lx}
                 problem = LinearElastic(fe, dirichlet_bc_info = dirichlet_bc_info, dbc_kwargs=dbc_kwargs)
                 
                 # problem = LinearElastic(fe, dirichlet_bc_info = dirichlet_bc_info, i=0)
@@ -254,31 +275,24 @@ if __name__ == "__main__":
 
                 solver = Newton_Solver(problem, np.zeros_like(fe.nodes), line_search_flag=False)
 
-
-
-                # e_11 = e_11_0 * np.ones_like(lmbda)
-
-                # check the max and min of each value, makes sure they're defined correctly
-                print(np.max(e_11[:,:,0,0]))
-                print(np.min(e_11[:,:,0,0]))
-                print(np.max(lmbda))
-                print(np.min(lmbda))
-                
-                # problem.internal_vars = [lmbda, mu, e_11]
-                #problem.internal_vars = [lmbda, mu]
-
-                # define the solver
-                # need to see if line search works for a hex problem.
-                #solver = Newton_Solver(problem, np.zeros_like(fe.nodes), line_search_flag=True)
-
-
                 # step the solve!
                 # for i in range(len(num_ramp_steps)):
                 # do this once for debugging the mesh refinement.
                 STEP=True
                 sol = np.zeros_like(fe.nodes)
+                u_step = u_i
+                u_fail_scale = 0.1 # will likely only fail when we wrinkle
+                consecutive_fails = 0
                 if STEP:
-                    for i in range(num_ramp_steps):
+                    # change the loading to a while loop
+                    # u_max = 0.1 * H
+                    # num_ramp_steps = 400             # need to step the dirichlet boundary condition!
+    
+                    # num_ramp_steps is a guess, might need to take smaller steps if we wrinkle
+
+                    while u_i < u_max:
+
+                    # for i in range(num_ramp_steps):
                         # update the boundary condition function
                         # def right_i(point):
                         #     np.isclose(point[0], Lx - (u_max * i / num_ramp_steps), atol=1e-5)
@@ -307,23 +321,39 @@ if __name__ == "__main__":
                         # solver.problem = problem
                         # ^ re-loading the problem class at each iteration is far too expensive to do this
 
-                        dbc_kwargs['i'] = i
+                        # dbc_kwargs['i'] = i
+                        dbc_kwargs['u_i'] = u_i
 
                         # might need to allow for a custom solver to be used to better handle contact...
-                        sol, info = solver.solve(atol=1e-5, max_iter=30, dirichlet_bc_info=dirichlet_bc_info, **dbc_kwargs)
+                        sol, info = solver.solve(atol=1e-5, max_iter=15, dirichlet_bc_info=dirichlet_bc_info, **dbc_kwargs)
 
-                        # update the initial guess!
-                        solver.initial_guess = sol
 
                         # need to figure out how the solver class interfaces with the problem class to update
                         # the boundary condition stepping..
+                        u_i_prev = u_i
 
                     
                         # save the solution at each iteration.
                         if info[0]:
+
                             status = 'converged'
+                            consecutive_fails = 0
+                            
+                            # update the initial guess!
+                            solver.initial_guess = sol
+
+                            # step normally
+                            u_i = u_i + u_step
                         else:
+
+                            u_i = u_i - u_step * u_fail_scale ** consecutive_fails # step back
+
+                            consecutive_fails += 1
                             status = 'failed'
+                            # this stepping algo might be broken...
+                            u_i = u_i + u_step * u_fail_scale ** consecutive_fails # small step fwd
+                            
+                        if consecutive_fails > 2:
                             print("Ramp loading failed")
                             break
                 else:

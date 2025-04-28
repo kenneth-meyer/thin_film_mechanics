@@ -14,8 +14,10 @@
 # nu_f=0.45
 
 # material parameters
-h=0.01    # 10 um
-H=1.0      # 1000 um
+h=0.0002    # 5.0 um
+# H=1.0      # 1000 um
+w=0.112
+D=0.056
 E_s=2.97   # 10 MPa
 nu_s=0.495
 E_f=7300 # 7300 MPa
@@ -31,7 +33,7 @@ f_scale=1.005
 #N_0_11=0.25
 
 # running one at a time right now
-python ../../runfiles/run_film_substrate_prestress.py $h $H $E_s $nu_s $E_f $nu_f $f_scale
+python ../../runfiles/run_film_substrate_prestress.py $h $w $D $E_s $nu_s $E_f $nu_f $f_scale
 
 # for E_s in {0.1,1,10}
 # do
