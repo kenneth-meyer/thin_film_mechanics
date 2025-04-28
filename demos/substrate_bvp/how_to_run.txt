@@ -1,0 +1,7 @@
+
+Currently, the way to run the input file is going to CARDIAX/cardiax and running
+
+python run.py /your_path/CARDIAX/demos/input_file/inputs.yaml
+
+This can be improved, but not sure how to call specific files from package from the
+input_file directory
