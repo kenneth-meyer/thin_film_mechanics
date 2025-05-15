@@ -131,6 +131,18 @@ class FilmSubstrate:
 ############## Functions to aid refinement and material param definitions ################
 ##########################################################################################
 
+def get_film_cells(fe, fe_info):
+    
+    # check if points are above a certain threshold
+    def film_above_substrate(pts):
+        return np.sum(pts[:,1] > fe_info.H) > 0
+    # print(fe.cells[0])
+    # cells = np.array(cells)
+    film_cells = jax.vmap(film_above_substrate)(fe.points[fe.cells])
+
+    # return the indices of the cells that are above the substrate line 
+    return film_cells
+
 def find_num_points_on_boundary(deg, dim):
     if dim == 3:
         if deg == 1:
@@ -276,6 +288,7 @@ def spatially_varying_linear_elastic_moduli(fe, fe_info, num_cells_in_plane, DEB
 
         Note: fe_info is a custom class that stores helpful information for the given problem
     """
+
     # use global variables to allow this to be vmapped?...
     num_nodes = fe.num_nodes
     num_quads = fe.num_quads

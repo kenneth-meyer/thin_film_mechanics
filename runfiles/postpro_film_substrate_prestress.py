@@ -50,12 +50,14 @@ if __name__ == "__main__":
 
     except:
         # raise Exception("Invalid input!")
-        h=0.2
-        H=2
-        E_s=10.0   # 10 MPa
-        nu_s=0.4
-        E_f=10000 # 10 GPa
-        nu_f=0.45
+        h=0.0002    # 5.0 um
+        # H=1.0      # 1000 um
+        w=0.112
+        D=0.056
+        E_s=2.97   # 10 MPa
+        nu_s=0.495
+        E_f=7300 # 7300 MPa
+        nu_f=0.35
         # can scale the initial membrane force
         f_c_scale=1.005
 
@@ -73,7 +75,7 @@ if __name__ == "__main__":
     num_substrate_cells = 1
     # u_max = 0.02            # 20 um
     # u_max = 0.02 * H
-    u_max = 0.02
+    u_max = 0.01
     num_ramp_steps = 100             # need to step the dirichlet boundary condition!
     y_ratio = h/num_substrate_cells
 
@@ -83,7 +85,7 @@ if __name__ == "__main__":
         #Nx, Ny = int(H / y_ratio), int((H + h) / y_ratio)
         
         # manually prescribing the number of cells; need to use mesh refinement now.
-        Nx, Ny = 280,562 # this is just 1 cell thick for the substrate, need
+        Nx, Ny = 1120,562 # this is just 1 cell thick for the substrate, need
         Lx, Ly = w, D + h
         vec = 2
         dim = 2
@@ -115,7 +117,7 @@ if __name__ == "__main__":
 
     # should realistically be checking against these....
     print("wavelength")
-    print(film_substrate_obj.get_wavelength_thick_limit())
+    print(film_substrate_obj.get_wavelength_thin_limit())
 
     # define the types of problems we want to run
     problem_list = ['hex']
@@ -172,6 +174,46 @@ if __name__ == "__main__":
                 elif CASE == '3D':
                     mesh_obj = create_3d_mesh(Nx_n, Ny_n, Nz, Lx, Ly, Lz, deg, data_dir)
 
+                # load the SOLUTION in 
+                sol_file =  data_dir + "/" + CASE + "_Nx_" + str(Nx_n) + "_Ny_" + str(Ny_n) + "_Nc_" + str(N_c) + "_u_" + str(u_max) + '.vtu'
+                # sol_file = data_dir + '/' + '2D_Nx_1120_Ny_562_Nc_0.006304222570479136_u_0.01.vtu'
+                mesh = meshio.read(sol_file)
+
+                # access cells where the film is defined
+                film_cells = onp.loadtxt("/workspace/kmeyer/school/thin_film_mechanics/demos/film_substrate_wrinkling/film_cells_1120_562_u_0.01.txt")
+
+                print(len(film_cells))
+                print(len(mesh.cells_dict['quad']))
+
+                print()
+                print(len(onp.where(film_cells)[0]))
+                
+                film_cell_idx = onp.where(film_cells)[0]
+
+                # print(mesh.cells_dict['quad'][np.array([560, 561])])
+                # print(mesh.cells_dict['quad'][561])
+
+
+
+                # film_cells = onp.array(film_cells, dtype=onp.int64)
+
+                # don't think this is working
+                film_cells_save = mesh.cells_dict['quad'][film_cell_idx]
+                print(film_cells_save)
+
+                # create a new mesh, with only the film, and solutions scaled by 100
+                film_cells_dict = {'quad': film_cells_save}
+                scaled_sol = mesh.point_data["sol"]
+                scaled_sol[:,1] = scaled_sol[:,1] * 100
+
+                print(onp.sum(film_cells))
+
+                film_mesh = meshio.Mesh(mesh.points, film_cells_dict, point_data={'sol': scaled_sol})
+
+                # save the mesh
+                save_sol_file = data_dir + "/scaled_film" + CASE + "_Nx_" + str(Nx_n) + "_Ny_" + str(Ny_n) + "_Nc_" + str(N_c) + "_u_" + str(u_max) + '.vtu'
+
+                meshio.write(save_sol_file, film_mesh)
 
                 # 8:24 PM - this is not working for some reason!!! idk what's going on
                 #           but negative numbers in the y direction are appearing!
@@ -241,8 +283,7 @@ if __name__ == "__main__":
                 if RUN_NAME == "nikravesh_recreation":
                     # define dirichlet boundary conditions
                     bc0 = [[left], [0], [u_0]]   
-                    # bc1 = [[front_left]*2, [0,1], [u_0]*2]
-                    bc1 = [[front], [1], [u_0]]
+                    bc1 = [[front_left]*2, [0,1], [u_0]*2]
                     bc2 = [[right], [0], [u_ramp]]             
                     dirichlet_bc_info = [[bc0, bc1, bc2]]
 
@@ -270,6 +311,7 @@ if __name__ == "__main__":
                 # save_sol()
                 # meshio.write("film_mesh_only.vtu", film_mesh)
 
+                raise Exception("aaaa stopping this for now")
                 
                 # save these cells to a file; need to visualize only the film and amplify the surface
                 # to check if there is wrinkling
@@ -379,12 +421,6 @@ if __name__ == "__main__":
                             
                         if consecutive_fails > 2:
                             print("Ramp loading failed")
-                            print("saving the last successful step")
-                            u_i = u_i + u_step * u_fail_scale ** consecutive_fails
-                            sol_file = data_dir + "/failed_u_i_" + str(u_i) + "_front_fixed" + CASE + "_Nx_" + str(Nx_n) + "_Ny_" + str(Ny_n) + "_Nc_" + str(N_c) + "_u_" + str(u_max) + '.vtu'
-                            # save the previous solution, stored as an initial guess
-                            save_sol(fe, solver.initial_guess, sol_file, cell_type=ele_type)
-
                             break
                 else:
                     problem = LinearElastic(fe, dirichlet_bc_info = dirichlet_bc_info)
@@ -399,7 +435,7 @@ if __name__ == "__main__":
 
 
                 # write the solution to a file
-                sol_file = data_dir + "/front_fixed" + CASE + "_Nx_" + str(Nx_n) + "_Ny_" + str(Ny_n) + "_Nc_" + str(N_c) + "_u_" + str(u_max) + '.vtu'
+                sol_file = data_dir + "/" + CASE + "_Nx_" + str(Nx_n) + "_Ny_" + str(Ny_n) + "_Nc_" + str(N_c) + "_u_" + str(u_max) + '.vtu'
                 
                 # save the mesh, along with material properties and prestrains, to a .vtu file
                 # the material properties and prestrain are the same for each point in each cell, can index just one of them

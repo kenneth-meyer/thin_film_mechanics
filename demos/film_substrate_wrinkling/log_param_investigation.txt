@@ -58,3 +58,6 @@ lmbda_c thick | f_c thick || lmbda_c thin | f_c thin
 h: 0.02, H:2.0, E_s:1.0, nu_s:0.45, E_f:10000.0, nu_f:0.4
 lmbda_c thick | f_c thick || lmbda_c thin | f_c thin
 1.844958412075163 | 0.27614506371229103 || 1.5980709583937878 | 0.2453731673237195
+h: 0.0001, H:0.0561, E_s:2.97, nu_s:0.495, E_f:7300.0, nu_f:0.35
+lmbda_c thick | f_c thick || lmbda_c thin | f_c thin
+0.005591865741201885 | 0.00262580220792837 || 0.004957840458427075 | 0.0022268918553887194
